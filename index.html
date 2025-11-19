@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VTE • PE • Pulmonary HTN – Drag & Drop Game</title>
+<style>
+  :root{
+    --bg:#050816; --card:#101827; --ink:#e8eefc; --muted:#9ca3c7;
+    --ok:#22c55e; --bad:#ef4444; --accent:#6366f1;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
+    background:radial-gradient(1200px 800px at 5% -10%, #1e293b, #020617 55%);
+    color:var(--ink);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+  }
+  header{padding:18px 20px 0}
+  h1{
+    margin:0 0 6px;
+    font-size:clamp(20px,3.2vw,30px);
+    font-weight:750;
+    letter-spacing:.2px;
+  }
+  p.lead{margin:0; color:var(--muted); max-width:720px}
+  .wrap{display:grid; gap:18px; padding:10px 20px 28px}
+  @media (min-width:1000px){ .wrap{grid-template-columns:1fr 1fr;} }
+  .panel{
+    background:linear-gradient(180deg,#111827,#020617);
+    border-radius:16px;
+    border:1px solid #1f2937;
+    padding:16px;
+    box-shadow:0 18px 45px rgba(0,0,0,.55);
+  }
+  .panel h2{margin:0 0 8px; font-size:18px; color:#c7d2fe}
+  .list,.grid{display:grid; gap:10px}
+  .list{grid-auto-rows:minmax(48px,auto)}
+  .pill{
+    background:#020617;
+    border-radius:12px;
+    border:1px solid #293548;
+    padding:10px 12px;
+    font-weight:650;
+    cursor:grab;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    transition:transform .08s ease,background .12s ease,border-color .12s ease;
+  }
+  .pill:hover{border-color:#4b5cff}
+  .pill:active{transform:scale(.98); cursor:grabbing}
+  .pill.lock{
+    cursor:default;
+    opacity:.55;
+    border-color:#374151;
+    background:#020617;
+  }
+  .desc{
+    border-radius:12px;
+    border:1.5px dashed #283548;
+    padding:12px;
+    min-height:60px;
+    background:#020617;
+    display:grid;
+    align-items:center;
+    transition:border-color .12s ease,background .12s ease;
+  }
+  .desc .slotTitle{
+    font-size:13px;
+    font-weight:700;
+    color:#c7d2fe;
+    margin-bottom:3px;
+  }
+  .desc .text{
+    font-size:14px;
+    line-height:1.3;
+    color:#e5e7eb;
+  }
+  .desc .accept{
+    font-size:12px;
+    font-style:italic;
+    color:#9ca3c7;
+    margin-top:4px;
+  }
+  .desc.correct{
+    border-color:var(--ok);
+    background:rgba(34,197,94,.08);
+  }
+  .desc.wrong{
+    border-color:var(--bad);
+    background:rgba(239,68,68,.08);
+  }
+  .footer{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+    justify-content:space-between;
+    margin-top:8px;
+  }
+  .btn{
+    border:none;
+    border-radius:999px;
+    padding:9px 14px;
+    font-weight:700;
+    cursor:pointer;
+    background:linear-gradient(180deg,#6366f1,#4f46e5);
+    color:white;
+    box-shadow:0 8px 25px rgba(79,70,229,.55);
+  }
+  .btn.secondary{
+    background:#111827;
+    color:#e5e7eb;
+    box-shadow:none;
+    border:1px solid #374151;
+  }
+  .score{font-weight:700; color:#e5e7eb}
+  .tiny{font-size:12px; color:#9ca3c7}
+  .tag{
+    display:inline-block;
+    padding:.2em .6em;
+    border-radius:999px;
+    border:1px solid #374151;
+    font-size:11px;
+    color:#c7d2fe;
+  }
+  .bucket{display:flex; gap:6px; flex-wrap:wrap; max-width:100%}
+</style>
+</head>
+<body>
+<header>
+  <h1>VTE • PE • Pulmonary Hypertension – Drag & Drop Drugs</h1>
+  <p class="lead">
+    Drag each <b>drug name</b> (left) onto its matching <b>description</b> (right).
+    Each description includes the drug’s <b>class</b> and the key <b>red-text warnings/BBW/contraindications</b> from the lecture.
+  </p>
+</header>
+
+<div class="wrap">
+  <section class="panel">
+    <h2>Drugs</h2>
+    <div id="drugList" class="list" aria-label="Draggable drug names"></div>
+    <div class="footer">
+      <div class="bucket" id="legend"></div>
+      <div>
+        <button id="shuffle" class="btn">Shuffle</button>
+        <button id="reset" class="btn secondary">Reset</button>
+      </div>
+    </div>
+    <p class="tiny">
+      Source: “Drugs Used to Treat PE/Thromboembolism/VTE/PAH” – Iszard.:contentReference[oaicite:1]{index=1}
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Descriptions</h2>
+    <div id="descGrid" class="grid"></div>
+    <div class="footer">
+      <div id="scoreArea" class="score">0 / 20 correct</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ITEMS = [
+  // --- Anticoagulants / Thrombolytic for PE/VTE ---
+  {id:"heparin", label:"Heparin (UFH)", group:"Anticoagulant – unfractionated heparin",
+   desc:"Anticoagulant – UFH used IV/SubQ for immediate effect in PE/DVT; also prophylaxis. Requires monitoring and bridging to longer-term therapy."},
+
+  {id:"enoxaparin", label:"Enoxaparin", group:"Anticoagulant – LMWH",
+   desc:"Anticoagulant – LMWH (enoxaparin) given SubQ; preferred for PE/VTE due to ease of use and predictable action."},
+
+  {id:"dalteparin", label:"Dalteparin", group:"Anticoagulant – LMWH",
+   desc:"Anticoagulant – LMWH (dalteparin) used SubQ for treatment and prophylaxis of VTE with more predictable dosing than UFH."},
+
+  {id:"warfarin", label:"Warfarin", group:"Oral anticoagulant – vitamin K antagonist",
+   desc:"Oral anticoagulant – inhibits vitamin K-dependent clotting factors; used for long-term anticoagulation after PE/VTE."},
+
+  {id:"rivaroxaban", label:"Rivaroxaban", group:"DOAC – factor Xa inhibitor",
+   desc:"Direct oral anticoagulant – factor Xa inhibitor for PE/VTE; newer agent that does not require regular monitoring and is convenient for long-term management."},
+
+  {id:"apixaban", label:"Apixaban", group:"DOAC – factor Xa inhibitor",
+   desc:"Direct oral anticoagulant – factor Xa inhibitor for treatment and prevention of thromboembolism without routine lab monitoring."},
+
+  {id:"dabigatran", label:"Dabigatran", group:"DOAC – direct thrombin inhibitor",
+   desc:"Direct oral anticoagulant – direct thrombin inhibitor used for VTE; convenient oral option without routine monitoring."},
+
+  {id:"alteplase", label:"Alteplase", group:"Thrombolytic – tPA",
+   desc:"Thrombolytic (clot-buster) – tPA that actively dissolves clots; used in severe or life-threatening PE, typically massive or hemodynamically unstable cases."},
+
+  // --- Prostanoids / Prostacyclin analogs ---
+  {id:"epoprostenol", label:"Epoprostenol", group:"Prostanoid – prostacyclin analog",
+   desc:"Prostanoid – IV continuous infusion that promotes vasodilation, inhibits smooth-muscle growth and platelet aggregation. Red: severe heart failure is a contraindication; abrupt discontinuation can cause life-threatening rebound PAH; risk of hypotension, syncope and bleeding due to antiplatelet effect."},
+
+  {id:"treprostinil", label:"Treprostinil", group:"Prostanoid – prostacyclin analog",
+   desc:"Prostanoid – given IV, SC, inhaled or oral with longer half-life and room-temperature stability. Red: additive hypotension with antihypertensives; ↑ bleeding with anticoagulants; systemic AEs (flushing, headache, jaw pain, nausea, diarrhea) and injection-site reactions require monitoring."},
+
+  {id:"iloprost", label:"Iloprost", group:"Prostanoid – prostacyclin analog (inhaled)",
+   desc:"Prostanoid – inhaled selective pulmonary vasodilator (6–9 doses/day). Red: risk of hypotension/syncope and rebound PAH if abruptly stopped; cough and throat irritation as inhalation-site reactions."},
+
+  {id:"selexipag", label:"Selexipag", group:"IP receptor agonist (prostanoid pathway)",
+   desc:"Oral IP-receptor agonist targeting the prostacyclin pathway. Red: hypotension/syncope, GI AEs (nausea, diarrhea), and bleeding risk from antiplatelet effects → need careful titration and education."},
+
+  // --- Endothelin receptor antagonists ---
+  {id:"bosentan", label:"Bosentan", group:"Endothelin receptor antagonist (ERA)",
+   desc:"ERA for PAH to improve exercise capacity and delay clinical worsening. Red BBW: hepatotoxicity and embryo-fetal toxicity – monitor liver enzymes monthly; contraindicated in pregnancy and with cyclosporine; may ↓ hormonal contraceptive effectiveness, cause anemia and ↓ sperm count."},
+
+  {id:"ambrisentan", label:"Ambrisentan", group:"Endothelin receptor
