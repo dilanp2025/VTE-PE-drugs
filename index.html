@@ -211,4 +211,143 @@ const ITEMS = [
   {id:"bosentan", label:"Bosentan", group:"Endothelin receptor antagonist (ERA)",
    desc:"ERA for PAH to improve exercise capacity and delay clinical worsening. Red BBW: hepatotoxicity and embryo-fetal toxicity – monitor liver enzymes monthly; contraindicated in pregnancy and with cyclosporine; may ↓ hormonal contraceptive effectiveness, cause anemia and ↓ sperm count."},
 
-  {id:"ambrisentan", label:"Ambrisentan", group:"Endothelin receptor
+  {id:"ambrisentan", label:"Ambrisentan", group:"Endothelin receptor antagonist (ERA)",
+   desc:"Selective ERA for PAH. Red: risks of hepatotoxicity and embryo-fetal toxicity; contraindicated in pregnancy; causes fluid retention/peripheral edema and ↓ sperm count; requires monthly pregnancy testing and caution with cyclosporine or strong CYP3A modulators."},
+
+  {id:"macitentan", label:"Macitentan", group:"Endothelin receptor antagonist (ERA)",
+   desc:"ERA for PAH that blocks endothelin receptors to reduce vascular resistance. Red: avoid in pregnancy and severe liver impairment; monitor liver enzymes and hemoglobin for hepatotoxicity and anemia; CYP3A4 inducers/inhibitors alter drug levels."},
+
+  // --- PDE-5 inhibitors ---
+  {id:"sildenafil", label:"Sildenafil", group:"PDE-5 inhibitor",
+   desc:"PDE-5 inhibitor for PAH to improve exercise ability and delay clinical worsening. Red: contraindicated with organic nitrates (severe hypotension) or hypersensitivity; not recommended in pediatrics; cautions in hypotension, pulmonary veno-occlusive disease, and with antihypertensives; may cause hearing/visual impairment and serious vaso-occlusive crises in sickle-cell pts; interacts with α-blockers, amlodipine and strong CYP3A inhibitors; avoid with other PDE-5 inhibitors."},
+
+  {id:"tadalafil", label:"Tadalafil", group:"PDE-5 inhibitor (longer t½)",
+   desc:"PDE-5 inhibitor for PAH with longer half-life than sildenafil. Shares class issues: contraindicated with nitrates/NO donors; additive BP-lowering with antihypertensives or α-blockers; avoid combination with other PDE-5 inhibitors."},
+
+  // --- Guanylate cyclase stimulator ---
+  {id:"riociguat", label:"Riociguat", group:"Soluble guanylate cyclase stimulator",
+   desc:"sGC stimulator used for PAH and CTEPH – ↑ cGMP and vasodilation, improves exercise capacity and delays worsening. Red: pregnancy Category X with embryo-fetal toxicity (REMS, strict contraception); contraindicated with nitrates, NO donors, and PDE inhibitors, and in pulmonary veno-occlusive disease; warnings for symptomatic hypotension, serious bleeding (hemoptysis, GI hemorrhage), and worsening PVOD; many interactions (CYP/P-gp inhibitors, antacids, smoking) and avoid in severe renal/hepatic impairment."},
+
+  // --- Calcium channel blockers for PAH subset ---
+  {id:"nifedipine", label:"Nifedipine", group:"Calcium channel blocker",
+   desc:"CCB used in vasoreactive PAH to vasodilate pulmonary arteries and ↓ right-sided afterload. Red limitations: not effective in non-vasoreactive PAH and carries risk of systemic hypotension → requires careful patient selection and monitoring."},
+
+  {id:"diltiazem", label:"Diltiazem", group:"Calcium channel blocker",
+   desc:"CCB used in selected PAH (esp. idiopathic PAH with elevated heart rate) by blocking L-type Ca²⁺ channels in vascular and cardiac tissue; causes pulmonary vasodilation and HR reduction. Red: risk of systemic hypotension and bradycardia → use only in vasoreactive patients with close monitoring."}
+];
+
+const $  = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+const shuffle = arr => {
+  for(let i = arr.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
+let picked = null;
+
+function buildGame(){
+  const drugList = $("#drugList");
+  const descGrid = $("#descGrid");
+  drugList.innerHTML = "";
+  descGrid.innerHTML = "";
+
+  const drugs   = shuffle([...ITEMS]);
+  const targets = shuffle([...ITEMS]);
+
+  // legend of classes
+  const groups = [...new Set(ITEMS.map(i => i.group))];
+  $("#legend").innerHTML = groups.map(g => `<span class="tag">${g}</span>`).join("");
+
+  // left side – pills
+  drugs.forEach(d => {
+    const el = document.createElement("div");
+    el.className = "pill";
+    el.textContent = d.label;
+    el.dataset.id = d.id;
+    el.setAttribute("draggable","true");
+    el.title = d.group;
+    el.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("text/plain", d.id);
+    });
+    el.addEventListener("click", () => {
+      if(!el.classList.contains("lock")) picked = d.id;
+    });
+    drugList.appendChild(el);
+  });
+
+  // right side – description boxes
+  targets.forEach(t => {
+    const box = document.createElement("div");
+    box.className = "desc";
+    box.dataset.id = t.id;
+    box.innerHTML = `
+      <div class="slotTitle">Description</div>
+      <div class="text">${t.desc}</div>
+      <div class="accept">Drop the matching drug here</div>
+    `;
+    box.addEventListener("dragover", e => e.preventDefault());
+    box.addEventListener("drop", e => {
+      e.preventDefault();
+      handleDrop(e.dataTransfer.getData("text/plain"), box);
+    });
+    box.addEventListener("click", () => {
+      if(picked) handleDrop(picked, box);
+    });
+    descGrid.appendChild(box);
+  });
+
+  updateScore();
+}
+
+function handleDrop(id, box){
+  if(!id || box.classList.contains("correct")) return;
+  const pill = document.querySelector(`.pill[data-id="${id}"]`);
+  if(!pill || pill.classList.contains("lock")) return;
+
+  if(id === box.dataset.id){
+    box.classList.remove("wrong");
+    box.classList.add("correct");
+    box.querySelector(".accept").innerHTML = `✅ Matched: <b>${pill.textContent}</b>`;
+    pill.classList.add("lock");
+    pill.setAttribute("draggable","false");
+  } else {
+    box.classList.add("wrong");
+    box.querySelector(".accept").textContent = "❌ Not a match, try again.";
+    setTimeout(() => {
+      box.classList.remove("wrong");
+      box.querySelector(".accept").textContent = "Drop the matching drug here";
+    }, 750);
+  }
+  picked = null;
+  updateScore();
+}
+
+function updateScore(){
+  const correct = $$(".desc.correct").length;
+  $("#scoreArea").textContent = `${correct} / ${ITEMS.length} correct` +
+    (correct === ITEMS.length ? " – All matched! 🎉" : "");
+}
+
+$("#shuffle").addEventListener("click", buildGame);
+$("#reset").addEventListener("click", () => {
+  $$(".pill").forEach(p => {
+    p.classList.remove("lock");
+    p.setAttribute("draggable","true");
+    p.style.opacity = "";
+    p.style.cursor  = "grab";
+  });
+  $$(".desc").forEach(d => {
+    d.classList.remove("correct","wrong");
+    const msg = d.querySelector(".accept");
+    if(msg) msg.textContent = "Drop the matching drug here";
+  });
+  updateScore();
+});
+
+buildGame();
+</script>
+</body>
+</html>
